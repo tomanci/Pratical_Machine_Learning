@@ -1,0 +1,132 @@
+---
+title: "Pratical machine learning"
+author: "Tommaso Ancilli"
+date: "5/18/2021"
+output: html_document
+---
+
+```{r }
+
+```
+
+# Load dataset and the library needed
+
+```{r }
+library(caret)
+library(ggplot2)
+library(rattle)
+library(randomForest)
+```
+
+Here, you can download the datasets:
+[training][1]
+
+[testing][2]
+
+```{r }
+pml_training<- read.csv("/Users/tommasoancilli/Downloads/pml-training.csv")
+pml_testing <- read.csv("/Users/tommasoancilli/Downloads/pml-testing.csv")
+```
+
+```{r }
+
+na_value <- colMeans(is.na(pml_training))
+na_value[which(na_value>0.5)]
+na_value <- as.data.frame(na_value)
+na_value$name <- names(colMeans(is.na(pml_training)))
+ggplot(data=na_value,aes(x=na_value,y=name))+geom_bar(stat='identity')
+
+```
+
+As you can see there are a lot of variables which have a plenty of Null/Na values, hence we must remove these from our data set. Otherwise we will face some difficulty in apply our regression models. 
+
+# Data cleaning
+
+I divided the data clining part in 3 subsets.
+
+In this *first one*, following the previous plot, I eliminate every column which has more than 50% of its value as NA. Obiviosly, I apply this function on both data sets
+```{r}
+na_value_elimination <- sapply(pml_training,function (x) mean(is.na(x))>0.5)
+
+pml_training <- pml_training[,na_value_elimination==F]
+pml_testing <- pml_testing[,na_value_elimination==F]
+```
+
+In this *second part*, manually I remove the first seven columns which are character columns, hence they are not usefull for the model. 
+```{r}
+pml_training <- subset(pml_training,select=-c(1:7))
+pml_testing <- subset(pml_testing,select = -c(1:7)) 
+```
+
+
+In the *last one*, I remove columns which do not give enough information. 
+```{r}
+index_value <- nearZeroVar(pml_training)
+
+pml_training <- pml_training[,-index_value]
+pml_testing <- pml_testing[,-index_value]
+```
+
+#Data partition
+As the course teaches, I divided my initial data set in a training and testing one. Therefore, I am able to conduct some inferential analysis and to validate my machine learning model.
+
+```{r}
+partition_index <- createDataPartition(pml_training$classe,p=0.7,list = F)
+
+training <- pml_training[partition_index,]
+testing <- pml_training[-partition_index,]
+```
+
+#Model Fitting
+
+To decide which is the best model for our problem I decided to develop several models, and the best I will use for predicting the outcome. 
+
+**Random forest model**
+```{r}
+mod_rf <- train(classe~.,data=training,method="rf",ntree=100)
+Predrf<- predict(mod_rf,testing)
+message("Statistics of randon forest model")
+confusionMatrix(Predrf,as.factor(testing$classe))
+plot(mod_rf$finalModel)
+```
+
+**Gradient boosting model**
+```{r}
+mod_gbm <- train(classe~.,data=training,method="gbm",verbose=F)
+Predgbm <- predict(mod_gbm,testing)
+message("Statistics of gbm")
+confusionMatrix(Predgbm,as.factor(testing$classe))
+plot(mod_gbm$finalModel)
+```
+
+**A tree model with a pre-processing of pca**
+```{r}
+fit_pca <- train(classe~.,data=training,method="rpart",preProcess="pca")
+PredPCA <- predict(fit_pca,testing)
+message("Statistics of r part with a pca")
+confusionMatrix(PredPCA,as.factor(testing$classe))
+```
+
+**LDA model**
+```{r}
+mod_lda <- train(classe~.,data=training,method="lda",verbose=F)
+Predlda<- predict(mod_lda,testing)
+message("Statistics of  lda")
+confusionMatrix(Predlda,as.factor(testing$classe))
+```
+
+
+# Conclusion
+
+As the data show, the best machine learning model is the *RANDOM FOREST* one, so I have used it to predict from the pml_testing data set.
+
+
+#Final Prediction
+
+```{r}
+predict(mod_rf,pml_testing)
+```
+
+[1]:https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+[2]:https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
